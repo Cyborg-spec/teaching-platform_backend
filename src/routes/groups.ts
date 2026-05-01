@@ -18,7 +18,7 @@ router.use(verifyFirebaseToken);
 
 router.get('/', async (req: Request & Partial<AuthenticatedRequest>, res: Response, next: NextFunction) => {
   try {
-    let groups = [];
+    let groups: any[] = [];
     if (req.user!.role === 'teacher') {
       groups = await groupService.getByTeacher(req.user!.uid);
     } else if (req.user!.role === 'admin') {

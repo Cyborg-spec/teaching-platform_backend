@@ -102,14 +102,14 @@ Teacher's notes: ${log.generalNotes || 'None'}
 Teacher's planned adjustments: ${log.nextLessonAdjustments || 'None'}
 
 ## UPCOMING LESSON (Lesson ${nextLesson.lessonNumber} — ${nextLesson.title})
-Core concept: ${nextLesson.coreConceptSummary || nextCurriculumLesson?.coreConcept || ''}
-Hook: ${nextLesson.hookText || nextCurriculumLesson?.hook || ''}
-Warm-up: ${nextCurriculumLesson?.warmUp || ''}
-Teaching Block A: ${nextLesson.teachingBlocks?.[0]?.title || ''} — ${nextLesson.teachingBlocks?.[0]?.content?.substring(0, 200) || ''}
-Teaching Block B: ${nextLesson.teachingBlocks?.[1]?.title || ''} — ${nextLesson.teachingBlocks?.[1]?.content?.substring(0, 200) || ''}
-Energy reset planned: ${nextCurriculumLesson?.energyReset?.type || 'Not specified'}
-Task: ${nextLesson.task?.description || ''} (min: ${nextLesson.task?.minimumVersion || ''} / ext: ${nextLesson.task?.extensionVersion || ''})
-Buffer note: ${nextLesson.bufferNote || 'None'}
+Core concept: ${(nextLesson as any).coreConceptSummary || (nextCurriculumLesson as any)?.coreConcept || ''}
+Hook: ${(nextLesson as any).hookText || (nextCurriculumLesson as any)?.hook || ''}
+Warm-up: ${(nextCurriculumLesson as any)?.warmUp || ''}
+Teaching Block A: ${(nextLesson as any).teachingBlocks?.[0]?.title || ''} — ${(nextLesson as any).teachingBlocks?.[0]?.content?.substring(0, 200) || ''}
+Teaching Block B: ${(nextLesson as any).teachingBlocks?.[1]?.title || ''} — ${(nextLesson as any).teachingBlocks?.[1]?.content?.substring(0, 200) || ''}
+Energy reset planned: ${(nextCurriculumLesson as any)?.energyReset?.type || 'Not specified'}
+Task: ${(nextLesson as any).task?.description || ''} (min: ${(nextLesson as any).task?.minimumVersion || ''} / ext: ${(nextLesson as any).task?.extensionVersion || ''})
+Buffer note: ${(nextLesson as any).bufferNote || 'None'}
 
 ${data.additionalContext ? `## ADDITIONAL CONTEXT FROM TEACHER\n${data.additionalContext}\n` : ''}
 ## YOUR TASK
