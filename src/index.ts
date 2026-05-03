@@ -33,7 +33,7 @@ app.use(helmet());
 // CORS
 const allowedOrigins = [
   'http://localhost:4200',
-  'https://teching-platform-frontend.vercel.app'
+  'https://jteaching-lab.vercel.app/'
 ];
 
 app.use(cors({
