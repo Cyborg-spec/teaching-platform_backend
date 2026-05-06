@@ -268,14 +268,14 @@ export class AdminController {
   async awardCoins(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { studentId, groupId, amount, reason } = req.body;
-      const adminId = (req as AuthenticatedRequest).user?.uid || 'admin';
+      const adminId = (req as unknown as AuthenticatedRequest).user?.uid || 'admin';
       
       await coinService.awardCoins(
         studentId,
         groupId,
         amount,
         reason || 'Admin manual award',
-        'manual',
+        'admin',
         null,
         adminId
       );
