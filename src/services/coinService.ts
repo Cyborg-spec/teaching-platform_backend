@@ -134,10 +134,14 @@ export class CoinService {
     }));
 
     // Get display names for all students
-    const enriched = await Promise.all(
+    const enriched = (await Promise.all(
       accounts.map(async (account: any) => {
         const userDoc = await db.collection('users').doc(account.studentId).get();
+        if (!userDoc.exists) return null; // Filter out deleted users
+        
         const userData = userDoc.data();
+        if (userData?.groupId !== groupId) return null; // Filter out users moved to another group
+        
         const sortField = type === 'weekly' ? account.weeklyCoins
           : type === 'monthly' ? account.monthlyCoins
           : account.totalCoins;
@@ -153,7 +157,7 @@ export class CoinService {
           rank: 0,
         };
       })
-    );
+    )).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
     // Sort by the appropriate field
     enriched.sort((a, b) => b.sortValue - a.sortValue);

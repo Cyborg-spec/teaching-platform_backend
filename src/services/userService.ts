@@ -105,6 +105,13 @@ export class UserService {
           studentIds: FieldValue.arrayUnion(userId)
         });
       }
+
+      // Update CoinAccount groupId
+      const coinRef = db.collection('coins').doc(userId);
+      const coinDoc = await coinRef.get();
+      if (coinDoc.exists) {
+        await coinRef.update({ groupId: data.groupId || null });
+      }
     }
 
     await this.collection.doc(userId).update(updateData);
@@ -141,6 +148,9 @@ export class UserService {
 
     await authService.deleteUser(userId);
     await this.collection.doc(userId).delete();
+    
+    // Delete their coin account as well
+    await db.collection('coins').doc(userId).delete();
   }
 
   /**
@@ -184,6 +194,12 @@ export class UserService {
       batch.update(db.collection('groups').doc(newGroupId), {
         studentIds: FieldValue.arrayUnion(uid)
       });
+      
+      // Update CoinAccount groupId if it exists
+      const coinDoc = await db.collection('coins').doc(uid).get();
+      if (coinDoc.exists) {
+        batch.update(db.collection('coins').doc(uid), { groupId: newGroupId });
+      }
     }
     await batch.commit();
 
