@@ -40,6 +40,13 @@ const bulkMoveSchema = z.object({
   groupId: z.string().min(1),
 });
 
+const awardCoinsSchema = z.object({
+  studentId: z.string().min(1, 'Student ID is required'),
+  groupId: z.string().min(1, 'Group ID is required'),
+  amount: z.number().int().min(1, 'Amount must be greater than 0'),
+  reason: z.string().optional(),
+});
+
 // Dashboard
 router.get('/dashboard', adminController.getDashboard.bind(adminController));
 
@@ -64,6 +71,9 @@ router.post('/groups/:groupId/archive', adminController.archiveGroup.bind(adminC
 router.get('/reports/lesson-logs', adminController.getLessonLogReport.bind(adminController));
 router.get('/reports/quiz-results', adminController.getQuizReport.bind(adminController));
 router.get('/reports/coins', adminController.getCoinReport.bind(adminController));
+
+// Coins
+router.post('/coins/award', validateBody(awardCoinsSchema), adminController.awardCoins.bind(adminController));
 
 // Settings
 router.get('/settings', adminController.getSettings.bind(adminController));

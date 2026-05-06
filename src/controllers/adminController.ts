@@ -4,6 +4,7 @@ import { groupService } from '../services/groupService';
 import { AuthenticatedRequest } from '../models/types';
 import { AppError } from '../utils/appError';
 import { db } from '../config/firebase';
+import { coinService } from '../services/coinService';
 
 export class AdminController {
   // ============= USERS =============
@@ -259,6 +260,27 @@ export class AdminController {
       const coinAccounts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       res.json({ data: coinAccounts });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async awardCoins(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { studentId, groupId, amount, reason } = req.body;
+      const adminId = (req as AuthenticatedRequest).user?.uid || 'admin';
+      
+      await coinService.awardCoins(
+        studentId,
+        groupId,
+        amount,
+        reason || 'Admin manual award',
+        'manual',
+        null,
+        adminId
+      );
+      
+      res.json({ message: `Awarded ${amount} coins to student` });
     } catch (error) {
       next(error);
     }
