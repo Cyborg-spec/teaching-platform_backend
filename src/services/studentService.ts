@@ -14,7 +14,7 @@ export class StudentService {
     const groupId = groupsRef.docs[0].id;
 
     const lessonsRef = await db.collection('lessons').where('groupId', '==', groupId).get();
-    const lessons = docsToObjects<any>(lessonsRef);
+    const lessons = this.dedupeByLessonNumber(docsToObjects<any>(lessonsRef));
 
     const monthIds = [...new Set(lessons.map(l => l.monthId).filter(Boolean))];
     const monthToDomain: Record<string, string> = {};
@@ -77,6 +77,37 @@ export class StudentService {
       ...q,
       hasSubmitted: submittedQuizIds.has(q.id)
     }));
+  }
+
+  private dedupeByLessonNumber(lessons: any[]): any[] {
+    const byNumber = new Map<number, any>();
+
+    for (const lesson of lessons) {
+      const lessonNumber = Number(lesson.lessonNumber);
+      if (!Number.isFinite(lessonNumber)) continue;
+
+      const existing = byNumber.get(lessonNumber);
+      if (!existing) {
+        byNumber.set(lessonNumber, lesson);
+        continue;
+      }
+
+      if (this.lessonScore(lesson) > this.lessonScore(existing)) {
+        byNumber.set(lessonNumber, lesson);
+      }
+    }
+
+    return Array.from(byNumber.values());
+  }
+
+  private lessonScore(lesson: any): number {
+    let score = 0;
+    if (lesson.status === 'completed') score += 10;
+    if (lesson.status === 'in_progress') score += 5;
+    if (lesson.studentPdfUrl) score += 2;
+    if (lesson.completedDate) score += 1;
+    if (lesson.scheduledDate) score += 1;
+    return score;
   }
 }
 

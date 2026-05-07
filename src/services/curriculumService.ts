@@ -155,13 +155,71 @@ export class CurriculumService {
   async createLessonsForGroup(monthId: string, groupId: string): Promise<void> {
     const curriculum = await this.getById(monthId);
     const lessonsCollection = db.collection('lessons');
-    const tasksCollection = db.collection('tasks'); // Assuming you create tasks explicitly here or elsewhere
+    const tasksCollection = db.collection('tasks');
 
-    const operations = curriculum.lessons.map((lesson) => {
-      return (batch: FirebaseFirestore.WriteBatch) => {
-        // Create lesson document
+    // Load already assigned lessons for this group + month so assignment can be idempotent.
+    const existingLessonsSnap = await lessonsCollection
+      .where('groupId', '==', groupId)
+      .where('monthId', '==', monthId)
+      .get();
+
+    const existingByLessonNumber = new Map<number, any[]>();
+    existingLessonsSnap.docs.forEach((doc) => {
+      const lessonNumber = Number(doc.data().lessonNumber);
+      if (!Number.isFinite(lessonNumber)) return;
+      const current = existingByLessonNumber.get(lessonNumber) || [];
+      current.push(doc);
+      existingByLessonNumber.set(lessonNumber, current);
+    });
+
+    for (const lesson of curriculum.lessons) {
+      const existingCandidates = existingByLessonNumber.get(lesson.lessonNumber) || [];
+      const existingLessonDoc = this.pickPreferredLessonDoc(existingCandidates);
+
+      if (existingLessonDoc) {
+        // Keep progress fields (status/schedule/completion) and refresh curriculum-linked fields.
+        await existingLessonDoc.ref.set(
+          {
+            monthId,
+            groupId,
+            lessonNumber: lesson.lessonNumber,
+            title: lesson.title,
+            teacherPdfUrl: lesson.teacherPdfUrl || null,
+            studentPdfUrl: lesson.studentPdfUrl || null,
+            homeworkPdfUrl: lesson.homeworkPdfUrl || null,
+          },
+          { merge: true }
+        );
+
+        const existingTaskSnap = await tasksCollection
+          .where('lessonId', '==', existingLessonDoc.id)
+          .limit(1)
+          .get();
+
+        if (existingTaskSnap.empty) {
+          await tasksCollection.add({
+            lessonId: existingLessonDoc.id,
+            groupId,
+            title: `Homework: ${lesson.title}`,
+            pdfUrl: lesson.homeworkPdfUrl || null,
+            dueDate: null,
+            isFinishAtHome: true,
+          });
+        } else {
+          await existingTaskSnap.docs[0].ref.set(
+            {
+              groupId,
+              title: `Homework: ${lesson.title}`,
+              pdfUrl: lesson.homeworkPdfUrl || null,
+              isFinishAtHome: true,
+            },
+            { merge: true }
+          );
+        }
+      } else {
+        // First-time assignment for this lesson number.
         const lessonRef = lessonsCollection.doc();
-        batch.set(lessonRef, {
+        await lessonRef.set({
           monthId,
           groupId,
           lessonNumber: lesson.lessonNumber,
@@ -174,20 +232,32 @@ export class CurriculumService {
           completedDate: null,
         });
 
-        // Also create the task document proactively
-        const taskRef = tasksCollection.doc();
-        batch.set(taskRef, {
+        await tasksCollection.add({
           lessonId: lessonRef.id,
           groupId,
           title: `Homework: ${lesson.title}`,
           pdfUrl: lesson.homeworkPdfUrl || null,
           dueDate: null,
-          isFinishAtHome: true
+          isFinishAtHome: true,
         });
-      };
-    });
+      }
+    }
+  }
 
-    await batchWrite(operations);
+  private pickPreferredLessonDoc(docs: any[]): any | null {
+    if (docs.length === 0) return null;
+
+    const score = (doc: any) => {
+      const data = doc.data ? doc.data() : {};
+      let value = 0;
+      if (data.status === 'completed') value += 10;
+      if (data.status === 'in_progress') value += 5;
+      if (data.completedDate) value += 2;
+      if (data.scheduledDate) value += 1;
+      return value;
+    };
+
+    return docs.sort((a, b) => score(b) - score(a))[0];
   }
 
   /**

@@ -17,7 +17,8 @@ export class LessonService {
       .where('groupId', '==', groupId)
       .orderBy('lessonNumber', 'asc')
       .get();
-    return docsToObjects<LessonDocument>(snapshot);
+    const lessons = docsToObjects<LessonDocument>(snapshot);
+    return this.dedupeByLessonNumber(lessons).sort((a, b) => a.lessonNumber - b.lessonNumber);
   }
 
   /**
@@ -144,6 +145,34 @@ export class LessonService {
       consecutiveFlagged: data.count,
       reasons: data.reasons,
     }));
+  }
+
+  private dedupeByLessonNumber(lessons: LessonDocument[]): LessonDocument[] {
+    const byNumber = new Map<number, LessonDocument>();
+
+    for (const lesson of lessons) {
+      const existing = byNumber.get(lesson.lessonNumber);
+      if (!existing) {
+        byNumber.set(lesson.lessonNumber, lesson);
+        continue;
+      }
+
+      if (this.lessonScore(lesson) > this.lessonScore(existing)) {
+        byNumber.set(lesson.lessonNumber, lesson);
+      }
+    }
+
+    return Array.from(byNumber.values());
+  }
+
+  private lessonScore(lesson: LessonDocument): number {
+    let score = 0;
+    if (lesson.status === 'completed') score += 10;
+    if (lesson.status === 'in_progress') score += 5;
+    if (lesson.teacherPdfUrl) score += 2;
+    if (lesson.completedDate) score += 1;
+    if (lesson.scheduledDate) score += 1;
+    return score;
   }
 }
 
