@@ -45,6 +45,15 @@ export class TaskService {
     return { id: docRef.id, ...taskData };
   }
 
+  /**
+   * Get a single task
+   */
+  async getTask(taskId: string): Promise<any> {
+    const doc = await this.tasksCollection.doc(taskId).get();
+    if (!doc.exists) throw AppError.notFound('Task', taskId);
+    return { id: doc.id, ...doc.data() };
+  }
+
   // ============= SUBMISSIONS =============
 
   /**
@@ -71,15 +80,23 @@ export class TaskService {
       if (existingData.status === 'reviewed') {
         throw AppError.conflict('ALREADY_REVIEWED', 'This task has already been reviewed. Contact your teacher.');
       }
+      const nextFileUrls =
+        data.fileUrls.length > 0 ? data.fileUrls : (existingData.fileUrls || []);
       // Update existing submission
       await this.submissionsCollection.doc(existing.docs[0].id).update({
         code: data.code,
         notes: data.notes,
-        fileUrls: data.fileUrls,
+        fileUrls: nextFileUrls,
         status: 'submitted',
         submittedAt: now(),
       });
-      return { id: existing.docs[0].id, ...existingData, ...data, status: 'submitted' } as TaskSubmission;
+      return {
+        id: existing.docs[0].id,
+        ...existingData,
+        ...data,
+        fileUrls: nextFileUrls,
+        status: 'submitted'
+      } as TaskSubmission;
     }
 
     const submissionData: Omit<TaskSubmission, 'id'> = {
