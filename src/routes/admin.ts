@@ -25,7 +25,7 @@ const updateUserSchema = z.object({
 
 const updateGroupSchema = z.object({
   name: z.string().min(2).optional(),
-  teacherId: z.string().optional(),
+  teacherId: z.string().min(1).optional(),
   monthIndex: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
   coinStoreItems: z.array(z.any()).optional(),

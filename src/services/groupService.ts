@@ -123,6 +123,15 @@ export class GroupService {
     const doc = await this.collection.doc(groupId).get();
     if (!doc.exists) throw AppError.notFound('Group', groupId);
 
+    if (data.teacherId) {
+      const teacherDoc = await db.collection('users').doc(data.teacherId).get();
+      if (!teacherDoc.exists) throw AppError.notFound('Teacher', data.teacherId);
+      const role = teacherDoc.data()?.role;
+      if (role !== 'teacher' && role !== 'admin') {
+        throw AppError.badRequest('INVALID_TEACHER', 'The specified user is not a teacher');
+      }
+    }
+
     await this.collection.doc(groupId).update(data);
   }
 
