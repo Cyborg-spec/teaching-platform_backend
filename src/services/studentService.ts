@@ -48,7 +48,39 @@ export class StudentService {
     const groupId = groupsRef.docs[0].id;
 
     const tasksRef = await db.collection('tasks').where('groupId', '==', groupId).get();
-    return docsToObjects(tasksRef);
+    const tasks = docsToObjects<any>(tasksRef);
+    if (tasks.length === 0) return tasks;
+
+    const lessonIds = [...new Set(tasks.map(t => t.lessonId).filter(Boolean))];
+    const lessonDocs = await Promise.all(
+      lessonIds.map(id => db.collection('lessons').doc(id).get())
+    );
+    const lessonById = new Map<string, any>();
+    lessonDocs.forEach(doc => {
+      if (doc.exists) lessonById.set(doc.id, doc.data());
+    });
+
+    const submissionsRef = await db.collection('task_submissions')
+      .where('studentId', '==', studentId)
+      .where('groupId', '==', groupId)
+      .get();
+    const submittedTaskIds = new Set(submissionsRef.docs.map(doc => doc.data().taskId));
+
+    const dedupedByKey = new Map<string, any>();
+    for (const task of tasks) {
+      const key = this.taskDedupKey(task, lessonById);
+      const existing = dedupedByKey.get(key);
+      if (!existing) {
+        dedupedByKey.set(key, task);
+        continue;
+      }
+
+      if (this.taskScore(task, submittedTaskIds) > this.taskScore(existing, submittedTaskIds)) {
+        dedupedByKey.set(key, task);
+      }
+    }
+
+    return Array.from(dedupedByKey.values());
   }
   /**
    * Get all active quizzes for the student's group, along with their submission status
@@ -107,6 +139,23 @@ export class StudentService {
     if (lesson.studentPdfUrl) score += 2;
     if (lesson.completedDate) score += 1;
     if (lesson.scheduledDate) score += 1;
+    return score;
+  }
+
+  private taskDedupKey(task: any, lessonById: Map<string, any>): string {
+    const lesson = lessonById.get(task.lessonId);
+    if (lesson && Number.isFinite(Number(lesson.lessonNumber))) {
+      return `${lesson.monthId || 'none'}:${lesson.lessonNumber}`;
+    }
+
+    return `title:${String(task.title || '').trim().toLowerCase()}`;
+  }
+
+  private taskScore(task: any, submittedTaskIds: Set<string>): number {
+    let score = 0;
+    if (submittedTaskIds.has(task.id)) score += 20;
+    if (task.pdfUrl) score += 2;
+    if (task.dueDate) score += 1;
     return score;
   }
 }
