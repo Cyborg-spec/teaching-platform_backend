@@ -136,7 +136,7 @@ export class TaskService {
   async getSubmissionsForGroup(
     groupId: string,
     filters?: { status?: string; studentId?: string; lessonId?: string }
-  ): Promise<TaskSubmission[]> {
+  ): Promise<any[]> {
     let query: FirebaseFirestore.Query = this.submissionsCollection
       .where('groupId', '==', groupId);
 
@@ -145,7 +145,67 @@ export class TaskService {
     if (filters?.lessonId) query = query.where('lessonId', '==', filters.lessonId);
 
     const snapshot = await query.orderBy('submittedAt', 'desc').get();
-    return docsToObjects<TaskSubmission>(snapshot);
+    const submissions = docsToObjects<TaskSubmission>(snapshot);
+    if (submissions.length === 0) return [];
+
+    const studentIds = [...new Set(submissions.map(s => s.studentId).filter(Boolean))];
+    const taskIds = [...new Set(submissions.map(s => s.taskId).filter(Boolean))];
+    const [studentDocs, taskDocs] = await Promise.all([
+      Promise.all(studentIds.map(id => db.collection('users').doc(id).get())),
+      Promise.all(taskIds.map(id => this.tasksCollection.doc(id).get())),
+    ]);
+
+    const studentNameById = new Map<string, string>();
+    studentDocs.forEach(doc => {
+      if (doc.exists) {
+        studentNameById.set(doc.id, doc.data()?.displayName || doc.id);
+      }
+    });
+
+    const taskById = new Map<string, any>();
+    taskDocs.forEach(doc => {
+      if (doc.exists) {
+        taskById.set(doc.id, doc.data());
+      }
+    });
+
+    const lessonIds = new Set<string>();
+    submissions.forEach(sub => {
+      if (sub.lessonId) lessonIds.add(sub.lessonId);
+      const task = taskById.get(sub.taskId);
+      if (task?.lessonId) lessonIds.add(task.lessonId);
+    });
+
+    const lessonDocs = await Promise.all(
+      Array.from(lessonIds).map(id => db.collection('lessons').doc(id).get())
+    );
+
+    const lessonById = new Map<string, any>();
+    lessonDocs.forEach(doc => {
+      if (doc.exists) {
+        lessonById.set(doc.id, doc.data());
+      }
+    });
+
+    return submissions.map((sub) => {
+      const studentName = studentNameById.get(sub.studentId) || sub.studentId;
+      const task = taskById.get(sub.taskId);
+      const lesson = lessonById.get(sub.lessonId || task?.lessonId || '');
+      const lessonNumber = Number(lesson?.lessonNumber);
+
+      const homeworkTitle = Number.isFinite(lessonNumber)
+        ? `HW${lessonNumber}`
+        : (task?.title ? String(task.title) : 'Homework');
+
+      return {
+        ...sub,
+        studentName,
+        taskTitle: task?.title || '',
+        lessonNumber: Number.isFinite(lessonNumber) ? lessonNumber : null,
+        homeworkTitle,
+        submissionLabel: `${homeworkTitle} - ${studentName}`,
+      };
+    });
   }
 
   /**
