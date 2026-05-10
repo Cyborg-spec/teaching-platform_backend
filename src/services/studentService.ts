@@ -80,7 +80,23 @@ export class StudentService {
       }
     }
 
-    return Array.from(dedupedByKey.values());
+    return Array.from(dedupedByKey.values()).sort((a, b) => {
+      const aLessonNumber = Number(lessonById.get(a.lessonId)?.lessonNumber);
+      const bLessonNumber = Number(lessonById.get(b.lessonId)?.lessonNumber);
+
+      // Latest homework (highest lesson number) first.
+      if (Number.isFinite(aLessonNumber) && Number.isFinite(bLessonNumber) && aLessonNumber !== bLessonNumber) {
+        return bLessonNumber - aLessonNumber;
+      }
+
+      if (Number.isFinite(aLessonNumber) && !Number.isFinite(bLessonNumber)) return -1;
+      if (!Number.isFinite(aLessonNumber) && Number.isFinite(bLessonNumber)) return 1;
+
+      // Fallback: newest due date first when lesson number is unavailable/equal.
+      const aDue = a.dueDate?._seconds ? a.dueDate._seconds : (a.dueDate ? Date.parse(a.dueDate) / 1000 : 0);
+      const bDue = b.dueDate?._seconds ? b.dueDate._seconds : (b.dueDate ? Date.parse(b.dueDate) / 1000 : 0);
+      return (bDue || 0) - (aDue || 0);
+    });
   }
   /**
    * Get all active quizzes for the student's group, along with their submission status
